@@ -33,18 +33,6 @@ def register_fonts():
 
 import os # 파일 상단에 import os 가 있는지 확인해주세요!
 
-@st.cache_resource
-def get_gspread_client():
-    # 1. 로컬 환경 확인 (key.json이 있으면 사용)
-    if os.path.exists("key.json"):
-        creds = Credentials.from_service_account_file("key.json", scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'])
-    # 2. 서버 환경 확인 (스트림릿 클라우드 설정)
-    else:
-        key_dict = json.loads(st.secrets["GSPREAD_JSON"])
-        creds = Credentials.from_service_account_info(key_dict, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'])
-    
-    return gspread.authorize(creds), build('drive', 'v3', credentials=creds)
-
 def load_data():
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY/edit#gid=0"
     url = SHEET_URL.replace("/edit#gid=", "/export?format=csv&gid=")
