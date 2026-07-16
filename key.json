@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "claimauto",
+  "private_key_id": "da2a69fb16499edbef11f9a99f2678cd5dc6ea1b",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCjbKempQxACqG6\nfD4tqdEfEjBlmgsK4sYKq3RJGY8F3Ji1zjwN/KqoT/PQsW/MW8hOWmSohLQjYdwA\n830qyaj6C5STeUTtKqRkzeiKGwWeX2AXVrjK8n19TE4U/BJjLQN+px4N1bkCG+ue\nu8wJYD9Ad7k5ocxGSvQ/T6OoeIdG/kqmdrv4diAWjHETtJ44VhhJROBQfzkY5+CT\nQ6Pxp4A6J3rujgebEy7bbrtcABeYX+Y4a8rEwy2zN6R5IZ3pVzK0X5mNq+iOicyf\nVZQfahXtMNLk0Tufji7j1bIOCXlntX5FPP3v6Z6NFN3ITVCBQQuyp/FsTPY+SfyZ\n694BhCZ9AgMBAAECggEAR0e4JDZvDmvUuMtCL5aXMO81DsvOrzPUX4kDEnNEb7EV\nJo9KoGspYHpnBQqvkboitxI0P1CKZbhkRkHtwUDuJAnzBxPo3W0xAQrSt5IrtDUz\na1qXBWYZGBK1J+/+cSWMFaz8rdofdO0Kq1SMHTbOv+a4covA1pQQzqCE6JGRp4PG\nKQfRGNM4yKaGnROnSaJrh4oLMVn3qzc7e7gvPXlPhiUm6Jmt00fR/dca4876/12z\nFmT8GJs5tywxsZFLnA1Js2XtiTWyMdi5cioIxFJDyroG0DUg8MN7PXTKZkxxtJdR\nz2NrVqHxWKazO6mqPQo44r5tqxAYfQHo/a2ouTPffQKBgQDUqz5ooajLvGc1b9yd\nyMDCcfdCGN3tfOHQqnog+I3+8Prmt8v7ZjFeIPevyntshM5ZRzQButIGRIsmwDKB\n8tmjaI7rNe3lyS7TH3MCGQ707UfMPBzo/K1zmmPqpqWDrfUkwclAq3shwefLJaQ1\n3QpAchvcWqt93xvC9JIz70aqGwKBgQDEuNTO4wTyvFMTN6NWse4ctnLJapGj+WNi\nOyEXGF4/1UooyHHfPXlMolipJ44VHkqSfCpo9NABhOKFtor9ya+P2GNLz3XnjK8j\nWcq9YqdSyONFhrfE+ae/A1auHK7bUuBhek5ldKx2IBEx0Oiw1PufvtRQzumc3ZQR\n52uAJpB7RwKBgQCvhsMUwtC5jz+0CCaTiB0on72PLU0GdXs/qWTxj5RLJgQ/ptVS\nIo9+fEFSMxHZiGdzomQXRWWRTMN48Ur+nDzrNSI4miNG89yU3jEjOyFwH+ORes/1\nsI9MidIL2w1i+JILi3Ia0S3ot80ji2bUGiMa+9No9OD0G9AjAY8mFEhDnwKBgQCC\nRHr3fTGbo8XHZgKNuEmbTd35Ls6+rLh5Jfqllodi8dSn6QQu9kBK1P6tFPprVaHA\nGuTil6reNqbiMJ0drd7J/FrUqs7CxFB9skok2x0+HrURJ0Kt9zxzqrxNk8Tei6T2\nJ82eNYK2vklkmZhc8MynXfCuijX8oGYa7Qos1Fy8pQKBgQCk+gDpD++5Y9y0ffyb\nQOmpqIbuPd3ZH8d9Nd1SCFbSgSQ+Xq+y6Tji1mD6JHMbOb1gK8npYpaoKfg/7vKz\nggHMkrIyso7AV98ZPyanysizVKK1Zpf5afMJfdRcctT5y6Q0KMgjPDKjk5ngtYlp\nNqKVwI6mXdGBdWHMtQIELCov3Q==\n-----END PRIVATE KEY-----\n",
+  "client_email": "bot-541@claimauto.iam.gserviceaccount.com",
+  "client_id": "108309918051093790848",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/bot-541%40claimauto.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
