@@ -45,9 +45,10 @@ def get_gspread_client():
     
     return gspread.authorize(creds), build('drive', 'v3', credentials=creds)
 
-def load_data(gc):
-    df = pd.DataFrame(gc.open_by_key(SHEET_ID).get_worksheet(0).get_all_records())
-    df.columns = [str(col).strip() for col in df.columns]
+def load_data():
+    SHEET_URL = "https://docs.google.com/spreadsheets/d/1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY/edit#gid=0"
+    url = SHEET_URL.replace("/edit#gid=", "/export?format=csv&gid=")
+    df = pd.read_csv(url)
     return df
 
 def get_drive_image_map(drive_service, folder_id):
