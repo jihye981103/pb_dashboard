@@ -152,10 +152,9 @@ def create_pdf(selected_data, image_map, items_per_page, drive_service):
 # --- UI ---
 register_fonts()
 st.set_page_config(page_title="PB 상품 카탈로그", layout="wide")
-gc, drive_service = get_gspread_client()
 st.markdown("# 📦 동원홈푸드 PB 상품 카탈로그")
 df_raw = load_data()
-image_map = get_drive_image_map(drive_service, FOLDER_ID)
+image_map = {}
 items_per_page = st.sidebar.selectbox("페이지당 품목 수", [1, 2, 4, 6, 9], index=4)
 selected_cats = st.multiselect("카테고리 선택", df_raw['카테고리'].unique(), default=df_raw['카테고리'].unique())
 
