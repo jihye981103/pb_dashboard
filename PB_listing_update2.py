@@ -82,13 +82,13 @@ def create_pdf(selected_data, image_map, items_per_page):
             unit = str(row.get('발주단위', '')).strip()
             shelf_life = str(row.get('소비기한', '')).strip()
             
-            c.setFont('NanumGothic', 7.0)
+            c.setFont('NanumGothic', 6.5)
             c.setFillColor(colors.black)
-            c.drawString(content_x, y + 48, f"상품코드: {p_code}")
+            c.drawString(content_x, y + 50, f"상품코드: {p_code}")
             c.drawString(content_x, y + 41, f"규격/입수량: {spec}")
-            c.drawString(content_x, y + 34, f"보관방법: {storage}")
-            c.drawString(content_x, y + 27, f"발주단위: {unit}")
-            c.drawString(content_x, y + 20, f"소비기한: {shelf_life}")
+            c.drawString(content_x, y + 32, f"보관방법: {storage}")
+            c.drawString(content_x, y + 23, f"발주단위: {unit}")
+            c.drawString(content_x, y + 14, f"소비기한: {shelf_life}")
 
             c.setStrokeColor(colors.darkgray)
             c.line(content_x, y + 60, content_x + content_w, y + 60)
