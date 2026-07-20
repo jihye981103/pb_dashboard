@@ -71,23 +71,24 @@ def create_pdf(selected_data, image_map, items_per_page):
             y = height - MARGIN_TOP - ((pos // cols) + 1) * cell_h
             content_x, content_w = x + 12, cell_w - 24
             
-            # 1. 상품명 출력
             p_title = Paragraph(str(row.get('품목명', '')).strip(), title_style)
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
-            # 2. 5가지 정보 출력 (수정된 부분)
+            # 5줄 배치 반영
             p_code = str(row.get('품목코드', '')).strip()
             spec = str(row.get('규격/입수량', '')).strip()
             storage = str(row.get('보관방법', '')).strip()
             unit = str(row.get('발주단위', '')).strip()
             shelf_life = str(row.get('소비기한', '')).strip()
             
-            c.setFont('NanumGothic', 6.5) # 글자 크기를 조금 줄여서 5개 정보 배치
+            c.setFont('NanumGothic', 6.5)
             c.setFillColor(colors.black)
-            c.drawString(content_x, y + 48, f"코드: {p_code} | 규격: {spec}")
-            c.drawString(content_x, y + 38, f"보관: {storage}")
-            c.drawString(content_x, y + 28, f"단위: {unit} | 기한: {shelf_life}")
+            c.drawString(content_x, y + 48, f"코드: {p_code}")
+            c.drawString(content_x, y + 41, f"규격: {spec}")
+            c.drawString(content_x, y + 34, f"보관: {storage}")
+            c.drawString(content_x, y + 27, f"단위: {unit}")
+            c.drawString(content_x, y + 20, f"기한: {shelf_life}")
 
             c.setStrokeColor(colors.darkgray)
             c.line(content_x, y + 60, content_x + content_w, y + 60)
