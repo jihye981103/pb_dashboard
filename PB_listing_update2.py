@@ -32,8 +32,20 @@ def register_fonts():
 
 @st.cache_resource
 def get_image_map_and_service():
-    key_dict = json.loads(st.secrets["GSPREAD_JSON"])
-    creds = Credentials.from_service_account_info(key_dict, scopes=['https://www.googleapis.com/auth/drive.readonly'])
+creds_dict = {
+        "type": st.secrets["type"],
+        "project_id": st.secrets["project_id"],
+        "private_key_id": st.secrets["private_key_id"],
+        "private_key": st.secrets["private_key"],
+        "client_email": st.secrets["client_email"],
+        "client_id": st.secrets["client_id"],
+        "auth_uri": st.secrets["auth_uri"],
+        "token_uri": st.secrets["token_uri"],
+        "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": st.secrets["client_x509_cert_url"],
+        "universe_domain": st.secrets["universe_domain"]
+    }
+    creds = Credentials.from_service_account_info(creds_dict, scopes=['https://www.googleapis.com/auth/drive.readonly'])
     drive_service = build('drive', 'v3', credentials=creds)
     
     file_map = {}
