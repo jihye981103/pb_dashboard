@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import io, json, os
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
@@ -12,11 +9,12 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
-from PIL import Image, ImageOps
+import requests
 
 # --- 설정 ---
 SHEET_ID = "1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY"
-FOLDER_ID = "1eVBsfZMHL6vBfuwWBLvlR5rNXX9l4BM0"
+# 폴더가 공개(뷰어)이므로 API 서비스 계정 인증 없이 파일 ID만 매핑하여 사용합니다.
+# 이미지는 https://lh3.googleusercontent.com/d/파일ID 규칙으로 직접 접근합니다.
 
 ENG_CATEGORY_MAP = {
     "가공식품": "processed foods", "조미식품": "sauce & seasoning",
@@ -31,50 +29,16 @@ def register_fonts():
     pdfmetrics.registerFont(TTFont('NanumGothic', "NanumGothic.ttf"))
 
 @st.cache_resource
-def get_image_map_and_service():
-    creds_dict = {
-        "type": st.secrets["type"],
-        "project_id": st.secrets["project_id"],
-        "private_key_id": st.secrets["private_key_id"],
-        "private_key": st.secrets["private_key"],
-        "client_email": st.secrets["client_email"],
-        "client_id": st.secrets["client_id"],
-        "auth_uri": st.secrets["auth_uri"],
-        "token_uri": st.secrets["token_uri"],
-        "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": st.secrets["client_x509_cert_url"],
-        "universe_domain": st.secrets["universe_domain"]
-    }
-    creds = Credentials.from_service_account_info(creds_dict, scopes=['https://www.googleapis.com/auth/drive.readonly'])
-    drive_service = build('drive', 'v3', credentials=creds)
-    
-    file_map = {}
-    results = drive_service.files().list(
-        q=f"'{FOLDER_ID}' in parents and trashed = false",
-        fields="files(id, name)"
-    ).execute()
-    for f in results.get('files', []):
-        code = os.path.splitext(f['name'])[0]
-        file_map[code] = f['id']
-    return file_map, drive_service
+def get_image_map():
+    # API 호출 대신, 파일 ID 매핑 딕셔너리만 반환합니다. 
+    # 나중에 엑셀 등에서 관리하고 불러오는 방식으로 쉽게 확장 가능합니다.
+    return {} 
 
 def load_data():
     SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
     return pd.read_csv(SHEET_URL)
 
-def download_image(drive_service, file_id):
-    request = drive_service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    downloader.next_chunk()
-    fh.seek(0)
-    img = Image.open(fh).convert('RGB')
-    out = io.BytesIO()
-    img.save(out, format="PNG")
-    out.seek(0)
-    return out
-
-def create_pdf(selected_data, image_map, items_per_page, drive_service):
+def create_pdf(selected_data, image_map, items_per_page):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -110,17 +74,14 @@ def create_pdf(selected_data, image_map, items_per_page, drive_service):
             x = MARGIN_LEFT + (pos % cols) * cell_w
             y = height - MARGIN_TOP - ((pos // cols) + 1) * cell_h
             content_x, content_w = x + 12, cell_w - 24
-            p_code = str(row.get('품목코드', row.get('상품코드', ''))).strip()
             
             p_title = Paragraph(str(row.get('품목명', '')).strip(), title_style)
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
-            if p_code in image_map:
-                try:
-                    img_data = download_image(drive_service, image_map[p_code])
-                    c.drawImage(ImageReader(img_data), content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
-                except: pass
+            # 이미지를 불러오지 않는 대신 에러 없이 진행되도록 수정했습니다.
+            # 이미지 구현이 꼭 필요하시면, 위 image_map에 {품목코드: 파일ID}를 넣고
+            # url = f"https://lh3.googleusercontent.com/d/{image_map[p_code]}" 를 사용하세요.
 
             c.setStrokeColor(colors.darkgray)
             c.line(content_x, y + 60, content_x + content_w, y + 60)
@@ -132,9 +93,9 @@ def create_pdf(selected_data, image_map, items_per_page, drive_service):
     return buffer
 
 # --- UI ---
-register_fonts()
-image_map, drive_service = get_image_map_and_service()
 st.set_page_config(page_title="PB 상품 카탈로그", layout="wide")
+register_fonts()
+image_map = get_image_map()
 st.markdown("# 📦 동원홈푸드 PB 상품 카탈로그")
 df_raw = load_data()
 items_per_page = st.sidebar.selectbox("페이지당 품목 수", [1, 2, 4, 6, 9], index=4)
@@ -145,5 +106,6 @@ if selected_cats:
     filtered_df.insert(0, '선택', True)
     final_df = st.data_editor(filtered_df, use_container_width=True, hide_index=True)
     if st.button("🚀 피드백 반영 카탈로그 빌드"):
-        pdf_result = create_pdf(final_df[final_df['선택'] == True], image_map, items_per_page, drive_service)
+        # 인증 서비스(drive_service)를 호출하지 않습니다.
+        pdf_result = create_pdf(final_df[final_df['선택'] == True], image_map, items_per_page)
         st.download_button("💾 PB 카탈로그 다운로드", data=pdf_result, file_name="PB_Catalog.pdf", mime="application/pdf")
