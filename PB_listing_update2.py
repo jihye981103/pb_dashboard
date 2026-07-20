@@ -13,8 +13,6 @@ import requests
 
 # --- 설정 ---
 SHEET_ID = "1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY"
-# 폴더가 공개(뷰어)이므로 API 서비스 계정 인증 없이 파일 ID만 매핑하여 사용합니다.
-# 이미지는 https://lh3.googleusercontent.com/d/파일ID 규칙으로 직접 접근합니다.
 
 ENG_CATEGORY_MAP = {
     "가공식품": "processed foods", "조미식품": "sauce & seasoning",
@@ -30,8 +28,6 @@ def register_fonts():
 
 @st.cache_resource
 def get_image_map():
-    # API 호출 대신, 파일 ID 매핑 딕셔너리만 반환합니다. 
-    # 나중에 엑셀 등에서 관리하고 불러오는 방식으로 쉽게 확장 가능합니다.
     return {} 
 
 def load_data():
@@ -75,13 +71,23 @@ def create_pdf(selected_data, image_map, items_per_page):
             y = height - MARGIN_TOP - ((pos // cols) + 1) * cell_h
             content_x, content_w = x + 12, cell_w - 24
             
+            # 1. 상품명 출력
             p_title = Paragraph(str(row.get('품목명', '')).strip(), title_style)
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
-            # 이미지를 불러오지 않는 대신 에러 없이 진행되도록 수정했습니다.
-            # 이미지 구현이 꼭 필요하시면, 위 image_map에 {품목코드: 파일ID}를 넣고
-            # url = f"https://lh3.googleusercontent.com/d/{image_map[p_code]}" 를 사용하세요.
+            # 2. 5가지 정보 출력 (수정된 부분)
+            p_code = str(row.get('품목코드', '')).strip()
+            spec = str(row.get('규격/입수량', '')).strip()
+            storage = str(row.get('보관방법', '')).strip()
+            unit = str(row.get('발주단위', '')).strip()
+            shelf_life = str(row.get('소비기한', '')).strip()
+            
+            c.setFont('NanumGothic', 6.5) # 글자 크기를 조금 줄여서 5개 정보 배치
+            c.setFillColor(colors.black)
+            c.drawString(content_x, y + 48, f"코드: {p_code} | 규격: {spec}")
+            c.drawString(content_x, y + 38, f"보관: {storage}")
+            c.drawString(content_x, y + 28, f"단위: {unit} | 기한: {shelf_life}")
 
             c.setStrokeColor(colors.darkgray)
             c.line(content_x, y + 60, content_x + content_w, y + 60)
@@ -106,6 +112,5 @@ if selected_cats:
     filtered_df.insert(0, '선택', True)
     final_df = st.data_editor(filtered_df, use_container_width=True, hide_index=True)
     if st.button("🚀 피드백 반영 카탈로그 빌드"):
-        # 인증 서비스(drive_service)를 호출하지 않습니다.
         pdf_result = create_pdf(final_df[final_df['선택'] == True], image_map, items_per_page)
         st.download_button("💾 PB 카탈로그 다운로드", data=pdf_result, file_name="PB_Catalog.pdf", mime="application/pdf")
