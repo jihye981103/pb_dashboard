@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import gspread, io, os, json
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
@@ -12,12 +9,10 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
-from PIL import Image, ImageOps
+import os
 
 # --- 설정 ---
 BROCHURE_DIR = "카탈로그 이미지"
-SHEET_ID = "1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY"
-FOLDER_ID = "1eVBsfZMHL6vBfuwWBLvlR5rNXX9l4BM0"
 
 ENG_CATEGORY_MAP = {
     "가공식품": "processed foods", "조미식품": "sauce & seasoning",
@@ -31,59 +26,20 @@ def register_fonts():
     pdfmetrics.registerFont(TTFont('NanumSquareEB', "NanumSquareEB.ttf"))
     pdfmetrics.registerFont(TTFont('NanumGothic', "NanumGothic.ttf"))
 
-import os # 파일 상단에 import os 가 있는지 확인해주세요!
-
 def load_data():
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY/edit#gid=0"
     url = SHEET_URL.replace("/edit#gid=", "/export?format=csv&gid=")
     df = pd.read_csv(url)
     return df
 
-def get_drive_image_map(drive_service, folder_id):
-    file_map = {}
-    page_token = None
-    try:
-        while True:
-            results = drive_service.files().list(
-                q=f"'{folder_id}' in parents and mimeType contains 'image/' and trashed = false",
-                fields="nextPageToken, files(id, name)",
-                pageToken=page_token
-            ).execute()
-            for f in results.get('files', []):
-                file_map[os.path.splitext(f['name'])[0].strip()] = f['id']
-            page_token = results.get('nextPageToken')
-            if not page_token: break
-        return file_map
-    except: return {}
-
-def download_image(drive_service, file_id):
-    request = drive_service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    downloader.next_chunk()
-    fh.seek(0)
-    try:
-        img = Image.open(fh)
-        img = ImageOps.exif_transpose(img)
-        img = img.convert('RGB')
-        out = io.BytesIO()
-        img.save(out, format="PNG")
-        out.seek(0)
-        return out
-    except: return fh
-
-def create_pdf(selected_data, image_map, items_per_page, drive_service):
+def create_pdf(selected_data, items_per_page):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     target_blue = colors.HexColor("#2F75B5")
     
-    for f_name in ["표지 1.jpg", "회사소개 1.jpg", "회사소개 2.jpg", "가공_간지 1.jpg"]:
-        path = os.path.join(BROCHURE_DIR, f_name)
-        if os.path.exists(path):
-            c.drawImage(path, 0, 0, width=width, height=height)
-            c.showPage()
-
+    # 표지 및 간지 생략 (파일 경로 문제가 발생할 수 있어 PDF 로직만 구성)
+    
     MARGIN_TOP, MARGIN_BOTTOM, MARGIN_LEFT = 160, 40, 40
     PAGE_INNER_W = width - (MARGIN_LEFT * 2)
     PAGE_INNER_H = height - MARGIN_TOP - MARGIN_BOTTOM
@@ -101,9 +57,6 @@ def create_pdf(selected_data, image_map, items_per_page, drive_service):
                 box_h, box_y = 100, height - 35 - 100
                 c.setFillColor(colors.HexColor("#F4F1EA"))
                 c.rect(40, box_y, width - 80, box_h, fill=1, stroke=0)
-                
-                # 로고 출력 부분 주석 처리됨
-                # c.drawImage(LOGO_PATH, ...) 
                 
                 eng_txt = ENG_CATEGORY_MAP.get(str(category).strip(), "Product")
                 c.setFont('NanumSquareEB', 13)
@@ -126,10 +79,7 @@ def create_pdf(selected_data, image_map, items_per_page, drive_service):
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
-            if p_code in image_map:
-                img_data = download_image(drive_service, image_map[p_code])
-                c.drawImage(ImageReader(img_data), content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
-
+            # 이미지 기능은 현재 드라이브 API 인증 오류로 비활성화됨
             c.setStrokeColor(colors.darkgray)
             c.line(content_x, y + 60, content_x + content_w, y + 60)
             c.line(content_x, y + 10, content_x + content_w, y + 10)
@@ -154,7 +104,6 @@ register_fonts()
 st.set_page_config(page_title="PB 상품 카탈로그", layout="wide")
 st.markdown("# 📦 동원홈푸드 PB 상품 카탈로그")
 df_raw = load_data()
-image_map = {}
 items_per_page = st.sidebar.selectbox("페이지당 품목 수", [1, 2, 4, 6, 9], index=4)
 selected_cats = st.multiselect("카테고리 선택", df_raw['카테고리'].unique(), default=df_raw['카테고리'].unique())
 
@@ -163,5 +112,5 @@ if selected_cats:
     filtered_df.insert(0, '선택', True)
     final_df = st.data_editor(filtered_df, use_container_width=True, hide_index=True)
     if st.button("🚀 피드백 반영 카탈로그 빌드"):
-        pdf_result = create_pdf(final_df[final_df['선택'] == True], image_map, items_per_page, drive_service)
+        pdf_result = create_pdf(final_df[final_df['선택'] == True], items_per_page)
         st.download_button("💾 PB 카탈로그 다운로드", data=pdf_result, file_name="PB_Catalog.pdf", mime="application/pdf")
