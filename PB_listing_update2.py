@@ -82,7 +82,7 @@ def create_pdf(selected_data, image_map, items_per_page):
             unit = str(row.get('발주단위', '')).strip()
             shelf_life = str(row.get('소비기한', '')).strip()
             
-            c.setFont('NanumGothic', 6.5)
+            c.setFont('NanumGothic', 7.0)
             c.setFillColor(colors.black)
             c.drawString(content_x, y + 48, f"코드: {p_code}")
             c.drawString(content_x, y + 41, f"규격: {spec}")
