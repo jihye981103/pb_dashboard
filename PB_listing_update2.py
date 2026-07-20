@@ -32,7 +32,7 @@ def register_fonts():
 
 @st.cache_resource
 def get_image_map_and_service():
-creds_dict = {
+    creds_dict = {
         "type": st.secrets["type"],
         "project_id": st.secrets["project_id"],
         "private_key_id": st.secrets["private_key_id"],
