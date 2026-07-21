@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import os
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
@@ -71,12 +72,22 @@ def create_pdf(selected_data, image_map, items_per_page):
             y = height - MARGIN_TOP - ((pos // cols) + 1) * cell_h
             content_x, content_w = x + 12, cell_w - 24
             
+            p_code = str(row.get('품목코드', '')).strip()
+
+            # --- [추가됨] '상품 이미지' 폴더에서 품목코드.png를 찾아 그려주는 부분 ---
+            image_path = f"상품 이미지/{p_code}.png"
+            if os.path.exists(image_path):
+                try:
+                    c.drawImage(image_path, content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
+                except:
+                    pass
+            # -----------------------------------------------------------------
+
             p_title = Paragraph(str(row.get('품목명', '')).strip(), title_style)
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
             # 5줄 배치 반영
-            p_code = str(row.get('품목코드', '')).strip()
             spec = str(row.get('규격/입수량', '')).strip()
             storage = str(row.get('보관방법', '')).strip()
             unit = str(row.get('발주단위', '')).strip()
