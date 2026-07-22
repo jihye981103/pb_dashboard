@@ -1,3 +1,4 @@
+import streamlit as io_st
 import streamlit as st
 import pandas as pd
 import io
@@ -10,18 +11,15 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
-import requests
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 # --- 설정 ---
 SHEET_ID = "1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY"
 
-# 구글 드라이브 인증을 위한 설정 (로컬에 있는 key.json 파일 사용)
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 KEY_FILE_PATH = 'key.json'  
-
-# ★ [필수] 구글 드라이브 '상품 이미지' 폴더의 ID를 여기에 입력하세요!
 DRIVE_FOLDER_ID = "1eVBsfZMHL6vBfuwWBLvlR5rNXX9l4BM0"
 
 ENG_CATEGORY_MAP = {
@@ -37,40 +35,68 @@ def register_fonts():
     pdfmetrics.registerFont(TTFont('NanumGothic', "NanumGothic.ttf"))
 
 @st.cache_resource
-def get_image_map():
-    """구글 드라이브 폴더를 스캔하여 {품목코드: 파일ID} 맵을 자동으로 생성합니다."""
-    image_map = {}
+def get_drive_service():
+    """구글 드라이브 API 서비스 객체를 생성합니다."""
     try:
-        # key.json 파일이 로컬에 있을 때만 작동
         if os.path.exists(KEY_FILE_PATH):
             creds = service_account.Credentials.from_service_account_file(
                 KEY_FILE_PATH, scopes=SCOPES
             )
-            service = build('drive', 'v3', credentials=creds)
-            
-            query = f"'{DRIVE_FOLDER_ID}' in parents and trashed = false"
+            return build('drive', 'v3', credentials=creds)
+    except Exception as e:
+        print(f"인증 오류: {e}")
+    return None
+
+@st.cache_resource
+def get_image_map():
+    """지정한 폴더 및 하위 폴더까지 탐색하여 {품목코드: 파일ID} 맵을 생성합니다."""
+    image_map = {}
+    service = get_drive_service()
+    if not service:
+        return image_map
+
+    try:
+        # 1. 탐색할 폴더 목록 큐 (최상위 폴더부터 시작)
+        folders_to_check = [DRIVE_FOLDER_ID]
+        checked_folders = set()
+
+        while folders_to_check:
+            current_folder_id = folders_to_check.pop(0)
+            if current_folder_id in checked_folders:
+                continue
+            checked_folders.add(current_folder_id)
+
             page_token = None
-            
             while True:
+                # 폴더 안의 파일 및 하위 폴더 조회
+                query = f"'{current_folder_id}' in parents and trashed = false"
                 response = service.files().list(
                     q=query,
                     spaces='drive',
-                    fields='nextPageToken, files(id, name)',
+                    fields='nextPageToken, files(id, name, mimeType)',
                     pageToken=page_token
                 ).execute()
-                
+
                 for file in response.get('files', []):
-                    file_name = file.get('name')
                     file_id = file.get('id')
-                    p_code = os.path.splitext(file_name)[0].strip()
-                    image_map[p_code] = file_id
-                    
+                    file_name = file.get('name')
+                    mime_type = file.get('mimeType')
+
+                    # 만약 하위 폴더라면 탐색 목록에 추가
+                    if mime_type == 'application/vnd.google-apps.folder':
+                        folders_to_check.append(file_id)
+                    else:
+                        # 파일인 경우 확장자 제거 후 품목코드로 등록
+                        p_code = os.path.splitext(file_name)[0].strip()
+                        image_map[p_code] = file_id
+
                 page_token = response.get('nextPageToken', None)
                 if not page_token:
                     break
+        print(f"✅ 총 {len(image_map)}개의 상품 이미지를 드라이브에서 불러왔습니다.")
     except Exception as e:
-        print(f"드라이브 이미지 목록 로드 중 오류 발생: {e}")
-        
+        print(f"❌ 이미지 목록 로드 중 오류 발생: {e}")
+
     return image_map
 
 def load_data():
@@ -91,6 +117,8 @@ def create_pdf(selected_data, image_map, items_per_page):
     rows = items_per_page // cols
     cell_w, cell_h = PAGE_INNER_W / cols, PAGE_INNER_H / rows
     title_style = ParagraphStyle('ItemTitle', fontName='NanumGothic', fontSize=8, leading=11)
+
+    service = get_drive_service()
 
     for category, group in selected_data.groupby('카테고리', sort=False):
         item_idx = 0
@@ -116,24 +144,26 @@ def create_pdf(selected_data, image_map, items_per_page):
             
             p_code = str(row.get('품목코드', '')).strip()
 
-            # --- 구글 드라이브 자동 매핑을 통한 이미지 불러오기 ---
+            # --- 구글 드라이브 공식 API를 통한 안전한 이미지 다운로드 ---
             image_id = image_map.get(p_code)
-            if image_id:
-                image_url = f"https://lh3.googleusercontent.com/d/{image_id}"
+            if image_id and service:
                 try:
-                    response = requests.get(image_url)
-                    if response.status_code == 200:
-                        img_data = io.BytesIO(response.content)
-                        c.drawImage(ImageReader(img_data), content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
-                except:
+                    request = service.files().get_media(fileId=image_id)
+                    fh = io.BytesIO()
+                    downloader = MediaIoBaseDownload(fh, request)
+                    done = False
+                    while not done:
+                        status, done = downloader.next_chunk()
+                    fh.seek(0)
+                    c.drawImage(ImageReader(fh), content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
+                except Exception as e:
                     pass
-            # ----------------------------------------------------
+            # -----------------------------------------------------------
 
             p_title = Paragraph(str(row.get('품목명', '')).strip(), title_style)
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
-            # 5줄 정보 출력
             spec = str(row.get('규격/입수량', '')).strip()
             storage = str(row.get('보관방법', '')).strip()
             unit = str(row.get('발주단위', '')).strip()
