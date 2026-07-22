@@ -35,42 +35,59 @@ def register_fonts():
 
 @st.cache_resource
 def get_drive_service():
+    """스트림릿 클라우드 Secrets 또는 로컬 key.json을 통해 구글 드라이브 인증을 수행합니다."""
     try:
-        if os.path.exists(KEY_FILE_PATH):
+        # 1. Streamlit Cloud에 등록된 Secrets가 있는 경우 (클라우드 환경)
+        if "gcp_service_account" in st.secrets:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = service_account.Credentials.from_service_account_info(
+                creds_dict, scopes=SCOPES
+            )
+            return build('drive', 'v3', credentials=creds)
+        
+        # 2. 로컬 PC에 key.json 파일이 있는 경우 (로컬 환경)
+        elif os.path.exists(KEY_FILE_PATH):
             creds = service_account.Credentials.from_service_account_file(
                 KEY_FILE_PATH, scopes=SCOPES
             )
             return build('drive', 'v3', credentials=creds)
+            
     except Exception as e:
         print(f"인증 오류: {e}")
     return None
 
 @st.cache_resource
 def get_image_map():
+    """구글 드라이브 폴더를 스캔하여 {품목코드: 파일ID} 맵을 자동으로 생성합니다."""
     image_map = {}
     service = get_drive_service()
     if not service:
-        print("❌ 드라이브 서비스 연결 실패")
         return image_map
 
     try:
         query = f"'{DRIVE_FOLDER_ID}' in parents and trashed = false"
-        response = service.files().list(
-            q=query, spaces='drive', fields='files(id, name)'
-        ).execute()
+        page_token = None
         
-        files = response.get('files', [])
-        print(f"\n[디버깅] 구글 드라이브 폴더에서 찾은 파일 총 {len(files)}개:")
-        for file in files:
-            file_name = file.get('name')
-            file_id = file.get('id')
-            p_code = os.path.splitext(file_name)[0].strip()
-            image_map[p_code] = file_id
-            print(f"  - 파일명: '{file_name}' -> 추출된 품목코드: '{p_code}'")
+        while True:
+            response = service.files().list(
+                q=query,
+                spaces='drive',
+                fields='nextPageToken, files(id, name)',
+                pageToken=page_token
+            ).execute()
             
+            for file in response.get('files', []):
+                file_name = file.get('name')
+                file_id = file.get('id')
+                p_code = os.path.splitext(file_name)[0].strip()
+                image_map[p_code] = file_id
+                
+            page_token = response.get('nextPageToken', None)
+            if not page_token:
+                break
     except Exception as e:
-        print(f"❌ 이미지 목록 로드 중 오류 발생: {e}")
-
+        print(f"드라이브 이미지 목록 로드 중 오류 발생: {e}")
+        
     return image_map
 
 def load_data():
@@ -94,7 +111,6 @@ def create_pdf(selected_data, image_map, items_per_page):
 
     service = get_drive_service()
 
-    print("\n[디버깅] PDF 생성 중 품목코드 매칭 시도:")
     for category, group in selected_data.groupby('카테고리', sort=False):
         item_idx = 0
         for _, row in group.iterrows():
@@ -118,28 +134,24 @@ def create_pdf(selected_data, image_map, items_per_page):
             content_x, content_w = x + 12, cell_w - 24
             
             p_code = str(row.get('품목코드', '')).strip()
-            p_name = str(row.get('품목명', '')).strip()
 
-            # --- 이미지 매칭 확인 및 다운로드 ---
+            # --- 구글 드라이브 API를 통한 이미지 다운로드 ---
             image_id = image_map.get(p_code)
-            if image_id:
-                print(f"  [성공] 품목코드 '{p_code}' ({p_name}) -> 이미지 매칭됨!")
-                if service:
-                    try:
-                        request = service.files().get_media(fileId=image_id)
-                        fh = io.BytesIO()
-                        downloader = MediaIoBaseDownload(fh, request)
-                        done = False
-                        while not done:
-                            status, done = downloader.next_chunk()
-                        fh.seek(0)
-                        c.drawImage(ImageReader(fh), content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
-                    except Exception as e:
-                        print(f"  [오류] 이미지 다운로드 중 에러: {e}")
-            else:
-                print(f"  [실패] 품목코드 '{p_code}' ({p_name}) -> 드라이브에서 일치하는 파일을 찾지 못함")
+            if image_id and service:
+                try:
+                    request = service.files().get_media(fileId=image_id)
+                    fh = io.BytesIO()
+                    downloader = MediaIoBaseDownload(fh, request)
+                    done = False
+                    while not done:
+                        status, done = downloader.next_chunk()
+                    fh.seek(0)
+                    c.drawImage(ImageReader(fh), content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
+                except Exception as e:
+                    pass
+            # ---------------------------------------------
 
-            p_title = Paragraph(p_name, title_style)
+            p_title = Paragraph(str(row.get('품목명', '')).strip(), title_style)
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
