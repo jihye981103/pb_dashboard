@@ -11,9 +11,18 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
 import requests
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 # --- 설정 ---
 SHEET_ID = "1oS1KrUvgTZdrzyJ_JcP1fEOXAn_A8M53Wq-Dn4DYpvY"
+
+# 구글 드라이브 인증을 위한 설정 (로컬에 있는 key.json 파일 사용)
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+KEY_FILE_PATH = 'key.json'  
+
+# ★ [필수] 구글 드라이브 '상품 이미지' 폴더의 ID를 여기에 입력하세요!
+DRIVE_FOLDER_ID = "1eVBsfZMHL6vBfuwWBLvlR5rNXX9l4BM0"
 
 ENG_CATEGORY_MAP = {
     "가공식품": "processed foods", "조미식품": "sauce & seasoning",
@@ -29,7 +38,40 @@ def register_fonts():
 
 @st.cache_resource
 def get_image_map():
-    return {} 
+    """구글 드라이브 폴더를 스캔하여 {품목코드: 파일ID} 맵을 자동으로 생성합니다."""
+    image_map = {}
+    try:
+        # key.json 파일이 로컬에 있을 때만 작동
+        if os.path.exists(KEY_FILE_PATH):
+            creds = service_account.Credentials.from_service_account_file(
+                KEY_FILE_PATH, scopes=SCOPES
+            )
+            service = build('drive', 'v3', credentials=creds)
+            
+            query = f"'{DRIVE_FOLDER_ID}' in parents and trashed = false"
+            page_token = None
+            
+            while True:
+                response = service.files().list(
+                    q=query,
+                    spaces='drive',
+                    fields='nextPageToken, files(id, name)',
+                    pageToken=page_token
+                ).execute()
+                
+                for file in response.get('files', []):
+                    file_name = file.get('name')
+                    file_id = file.get('id')
+                    p_code = os.path.splitext(file_name)[0].strip()
+                    image_map[p_code] = file_id
+                    
+                page_token = response.get('nextPageToken', None)
+                if not page_token:
+                    break
+    except Exception as e:
+        print(f"드라이브 이미지 목록 로드 중 오류 발생: {e}")
+        
+    return image_map
 
 def load_data():
     SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
@@ -74,20 +116,24 @@ def create_pdf(selected_data, image_map, items_per_page):
             
             p_code = str(row.get('품목코드', '')).strip()
 
-            # --- [추가됨] '상품 이미지' 폴더에서 품목코드.png를 찾아 그려주는 부분 ---
-            image_path = f"상품 이미지/{p_code}.png"
-            if os.path.exists(image_path):
+            # --- 구글 드라이브 자동 매핑을 통한 이미지 불러오기 ---
+            image_id = image_map.get(p_code)
+            if image_id:
+                image_url = f"https://lh3.googleusercontent.com/d/{image_id}"
                 try:
-                    c.drawImage(image_path, content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
+                    response = requests.get(image_url)
+                    if response.status_code == 200:
+                        img_data = io.BytesIO(response.content)
+                        c.drawImage(ImageReader(img_data), content_x, y + 80, width=content_w, height=cell_h - 110, preserveAspectRatio=True, anchor='c')
                 except:
                     pass
-            # -----------------------------------------------------------------
+            # ----------------------------------------------------
 
             p_title = Paragraph(str(row.get('품목명', '')).strip(), title_style)
             p_title.wrap(content_w, cell_h)
             p_title.drawOn(c, content_x, y + 66)
 
-            # 5줄 배치 반영
+            # 5줄 정보 출력
             spec = str(row.get('규격/입수량', '')).strip()
             storage = str(row.get('보관방법', '')).strip()
             unit = str(row.get('발주단위', '')).strip()
